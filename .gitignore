@@ -8,3 +8,7 @@ __pycache__/
 # Test output: Playwright traces and screenshots, HTML report
 test-results/
 reports/
+
+# IDE settings
+.idea/
+.vscode/

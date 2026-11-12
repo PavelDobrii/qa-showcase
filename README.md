@@ -5,6 +5,8 @@
 This is an example of my test automation work. The tests check **Toolshop**
 ([practicesoftwaretesting.com](https://practicesoftwaretesting.com)), a demo web shop
 with a REST API. The site is made for test practice and is open to everyone.
+On your computer the tests use the public site. In CI they use a copy of the app
+that the workflow starts in Docker.
 
 ## What the project shows
 
@@ -17,10 +19,11 @@ with a REST API. The site is made for test practice and is open to everyone.
   See [How the tests stay stable](#how-the-tests-stay-stable).
 - Unit tests for the framework code (the retry logic).
 - GitHub Actions: lint and tests on every push and pull request, HTML report as an artifact.
+- The app under test runs in Docker inside the CI job, so CI does not depend on a shared public site.
 
 ## Stack
 
-Python 3.12 · pytest · Playwright for Python · httpx · jsonschema · pytest-html · ruff · GitHub Actions
+Python 3.12 · pytest · Playwright for Python · httpx · jsonschema · pytest-html · ruff · Docker Compose · GitHub Actions
 
 ## Tests
 
@@ -63,10 +66,20 @@ ruff check .
 ruff format --check .
 ```
 
+### Run against a local copy of the app
+
+You need Docker. This is the same setup as in CI:
+
+```bash
+bash ci/start-toolshop.sh          # UI on localhost:4200, API on localhost:8091
+UI_URL=http://localhost:4200 API_URL=http://localhost:8091 AVOID_DEMO_RESET=0 pytest
+docker compose -f ci/toolshop-compose.yml down --volumes   # stop and remove the copy
+```
+
 ### Settings
 
 The defaults work with the public demo. You can change them with environment variables,
-for example to test [your own copy](https://github.com/testsmith-io/practice-software-testing) of the app.
+for example to test a local copy of the app.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -82,11 +95,21 @@ The workflow is [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 It runs on every push to `main`, on every pull request, and by hand (the "Run workflow" button).
 
 1. **lint** job: `ruff check` and `ruff format --check`. If it fails, the tests do not start.
-2. **test** job: installs the dependencies and Chromium, then runs all tests with Python 3.12.
+2. **test** job:
+   - starts a copy of the Toolshop app with Docker Compose
+     ([`ci/toolshop-compose.yml`](ci/toolshop-compose.yml)) and fills its database with demo data
+     ([`ci/start-toolshop.sh`](ci/start-toolshop.sh));
+   - installs the dependencies and Chromium;
+   - runs all tests with Python 3.12 against this copy.
 3. The test job uploads the `test-report` artifact: an HTML report, a JUnit XML file,
    and for each failed UI test a screenshot and a Playwright trace.
-   The artifact is uploaded also when tests fail.
+   If a test fails, the artifact also has the app logs.
    To open a trace: `playwright show-trace trace.zip`.
+
+Why a copy of the app and not the public site? The public site is behind Cloudflare bot
+protection. It shows a "security verification" page to a browser on a CI server, so UI tests
+cannot open the shop there. The API is not blocked. A copy in Docker also gives CI clean data:
+no products from other people and no hourly reset.
 
 ## How the tests stay stable
 
@@ -106,10 +129,11 @@ and its data changes. These rules keep the tests stable:
 3. **Do not depend on data you do not own.** Other people add products to the demo.
    So the tests do not check exact totals, and they take product ids from the API
    instead of writing them in the code.
-4. **Know your test environment.** The demo database is rebuilt every hour at :00 UTC,
+4. **Know your test environment.** The public demo database is rebuilt every hour at :00 UTC,
    and all ids change. The tests do not start in the last 2 minutes before the reset,
    and after the reset they wait until the data is back
    ([`framework/demo_reset.py`](framework/demo_reset.py)).
+   CI uses its own copy of the app, so this check is off there (`AVOID_DEMO_RESET=0`).
 5. **Each test has its own data.** A cart test creates a new cart and deletes it at the end.
    Each UI test gets a new browser context, so it does not see cookies or storage of other tests.
 
@@ -121,6 +145,9 @@ A flaky test is a bug that must be found and fixed.
 ```text
 .
 ├── .github/workflows/tests.yml   CI: lint, tests, report
+├── ci/
+│   ├── toolshop-compose.yml      copy of the app under test for CI (Docker Compose)
+│   └── start-toolshop.sh         start the copy, fill the database, wait until it is ready
 ├── framework/                    code that the tests use
 │   ├── api/
 │   │   ├── client.py             API client (httpx)

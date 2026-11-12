@@ -37,8 +37,17 @@ jobs:
     needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # The public demo site blocks browsers from CI servers (Cloudflare bot protection).
+      # So CI tests its own copy of the app, started in Docker.
+      UI_URL: http://localhost:4200
+      API_URL: http://localhost:8091
+      AVOID_DEMO_RESET: "0"
     steps:
       - uses: actions/checkout@v7
+      - name: Start the app containers
+        # The UI needs about a minute to start, so start it before the Python setup.
+        run: docker compose -f ci/toolshop-compose.yml up --detach --quiet-pull
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -47,8 +56,15 @@ jobs:
         run: pip install -r requirements.txt
       - name: Install Chromium for Playwright
         run: python -m playwright install --with-deps chromium
+      - name: Fill the database and wait for the app
+        run: bash ci/start-toolshop.sh
       - name: Run tests
         run: pytest --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
+      - name: Save app logs
+        if: failure()
+        run: |
+          mkdir -p reports
+          docker compose -f ci/toolshop-compose.yml logs --no-color > reports/toolshop.log 2>&1
       - name: Upload HTML report, traces and screenshots
         if: always()
         uses: actions/upload-artifact@v7
