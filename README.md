@@ -147,6 +147,7 @@ A flaky test is a bug that must be found and fixed.
 ├── .github/workflows/tests.yml   CI: lint, tests, report
 ├── ci/
 │   ├── toolshop-compose.yml      copy of the app under test for CI (Docker Compose)
+│   ├── nginx.conf                web server settings for the app API
 │   └── start-toolshop.sh         start the copy, fill the database, wait until it is ready
 ├── framework/                    code that the tests use
 │   ├── api/
