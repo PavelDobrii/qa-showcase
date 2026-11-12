@@ -1,0 +1,44 @@
+[project]
+name = "qa-showcase"
+version = "0.1.0"
+description = "Example test automation project: UI tests with Playwright, API tests with httpx, CI with GitHub Actions."
+readme = "README.md"
+requires-python = ">=3.12"
+# Dependencies are pinned in requirements.txt.
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--browser=chromium",
+    "--tracing=retain-on-failure",
+    "--screenshot=only-on-failure",
+]
+markers = [
+    "unit: fast tests of the framework code, no network",
+    "api: REST API tests with httpx",
+    "ui: browser tests with Playwright",
+    "smoke: a short set of the most important checks",
+]
+xfail_strict = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import order
+    "B",   # bugbear: likely bugs
+    "UP",  # modern Python syntax
+    "SIM", # simpler code
+    "PT",  # pytest style
+    "RUF", # ruff-specific rules
+]
